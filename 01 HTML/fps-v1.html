@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>body { margin: 0; overflow: hidden; } #instructions { position: absolute; top: 50%; width: 100%; text-align: center; color: white; cursor: pointer; }</style>
+</head>
+<body>
+    <div id="instructions">Click to Play</div>
+    <script type="module">
+        import * as THREE from 'https://cdn.skypack.dev/three@0.132.2';
+        import { PointerLockControls } from 'https://cdn.skypack.dev/three@0.132.2/examples/jsm/controls/PointerLockControls.js';
+
+        // Scene Setup
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        // Controls
+        const controls = new PointerLockControls(camera, document.body);
+        document.getElementById('instructions').onclick = () => controls.lock();
+
+        // Rocket Jump Logic
+        let velocity = new THREE.Vector3();
+        let direction = new THREE.Vector3();
+
+        // Add a dummy "Floor" and "Obstacle"
+        const floor = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), new THREE.MeshBasicMaterial({color: 0x444444}));
+        floor.rotation.x = -Math.PI / 2;
+        scene.add(floor);
+
+        camera.position.y = 2;
+
+        // Simple Rocket Jump Function
+        function rocketJump() {
+            velocity.y += 15; // Impulse strength
+        }
+
+        // Event listener for shooting (Simulated)
+        window.addEventListener('mousedown', (e) => {
+            if (controls.isLocked) rocketJump(); 
+        });
+
+        function animate() {
+            requestAnimationFrame(animate);
+            // Basic Gravity
+            if(camera.position.y > 2) velocity.y -= 0.8;
+            else velocity.y = 0;
+            
+            camera.position.y += velocity.y * 0.05;
+            renderer.render(scene, camera);
+        }
+        animate();
+    </script>
+</body>
+</html>

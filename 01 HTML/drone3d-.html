@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>3D Drone Sim</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #111; font-family: sans-serif; }
+        #ui { position: absolute; top: 20px; left: 20px; color: white; background: rgba(0,0,0,0.5); padding: 15px; border-radius: 8px; pointer-events: none; }
+        kbd { background: #444; padding: 2px 4px; border-radius: 3px; }
+    </style>
+</head>
+<body>
+    <div id="ui">
+        <h2 style="margin:0 0 10px 0">3D Quadcopter</h2>
+        <p><kbd>W</kbd> / <kbd>S</kbd> : Pitch (Forward/Back)</p>
+        <p><kbd>A</kbd> / <kbd>D</kbd> : Roll (Left/Right)</p>
+        <p><kbd>Q</kbd> / <kbd>E</kbd> : Yaw (Rotate)</p>
+        <p><kbd>Shift</kbd> / <kbd>Space</kbd> : Altitude</p>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'https://cdn.skypack.dev/three@0.136.0';
+
+        // --- Setup Scene ---
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x87ceeb); // Sky blue
+        scene.fog = new THREE.Fog(0x87ceeb, 50, 150);
+
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        // --- Lighting ---
+        const light = new THREE.DirectionalLight(0xffffff, 1);
+        light.position.set(10, 20, 10);
+        scene.add(light);
+        scene.add(new THREE.AmbientLight(0x404040));
+
+        // --- Environment (Ground) ---
+        const grid = new THREE.GridHelper(200, 40, 0x000000, 0x555555);
+        scene.add(grid);
+        const ground = new THREE.Mesh(
+            new THREE.PlaneGeometry(200, 200),
+            new THREE.MeshStandardMaterial({ color: 0x228b22 })
+        );
+        ground.rotation.x = -Math.PI / 2;
+        scene.add(ground);
+
+        // --- Drone Model ---
+        const droneGroup = new THREE.Group();
+        
+        // Body (X shape)
+        const armGeom = new THREE.BoxGeometry(0.2, 0.1, 4);
+        const mat = new THREE.MeshStandardMaterial({ color: 0x333333 });
+        const arm1 = new THREE.Mesh(armGeom, mat);
+        const arm2 = new THREE.Mesh(armGeom, mat);
+        arm2.rotation.y = Math.PI / 2;
+        droneGroup.add(arm1, arm2);
+
+        // Indicators (Front is Red)
+        const nose = new THREE.Mesh(new THREE.SphereGeometry(0.3), new THREE.MeshStandardMaterial({color: 0xff0000}));
+        nose.position.z = 2;
+        droneGroup.add(nose);
+
+        scene.add(droneGroup);
+
+        // --- Physics & Input ---
+        const state = {
+            pos: new THREE.Vector3(0, 5, 0),
+            vel: new THREE.Vector3(),
+            rot: new THREE.Euler(0, 0, 0, 'YXZ'),
+            vRot: new THREE.Euler(0,0,0)
+        };
+
+        const keys = {};
+        window.onkeydown = (e) => keys[e.code] = true;
+        window.onkeyup = (e) => keys[e.code] = false;
+
+        // --- Main Loop ---
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // 1. Rotation Logic (Yaw/Pitch/Roll)
+            if (keys['KeyQ']) state.rot.y += 0.04;
+            if (keys['KeyE']) state.rot.y -= 0.04;
+            
+            // Visual tilt based on movement
+            let targetTiltX = 0;
+            let targetTiltZ = 0;
+            if (keys['KeyW']) targetTiltX = -0.3;
+            if (keys['KeyS']) targetTiltX = 0.3;
+            if (keys['KeyA']) targetTiltZ = 0.3;
+            if (keys['KeyD']) targetTiltZ = -0.3;
+
+            state.rot.x = THREE.MathUtils.lerp(state.rot.x, targetTiltX, 0.1);
+            state.rot.z = THREE.MathUtils.lerp(state.rot.z, targetTiltZ, 0.1);
+
+            // 2. Movement Logic
+            const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(droneGroup.quaternion);
+            const right = new THREE.Vector3(1, 0, 0).applyQuaternion(droneGroup.quaternion);
+
+            if (keys['KeyW']) state.vel.addScaledVector(forward, 0.02);
+            if (keys['KeyS']) state.vel.addScaledVector(forward, -0.02);
+            if (keys['KeyA']) state.vel.addScaledVector(right, -0.02);
+            if (keys['KeyD']) state.vel.addScaledVector(right, 0.02);
+            if (keys['Space']) state.vel.y += 0.02;
+            if (keys['ShiftLeft']) state.vel.y -= 0.02;
+
+            // Apply Velocity & Friction
+            state.pos.add(state.vel);
+            state.vel.multiplyScalar(0.95); // Air resistance
+
+            // 3. Update Mesh
+            droneGroup.position.copy(state.pos);
+            droneGroup.rotation.copy(state.rot);
+
+            // 4. Camera Follow (Third Person)
+            const camOffset = new THREE.Vector3(0, 3, -7).applyQuaternion(droneGroup.quaternion);
+            camera.position.lerp(state.pos.clone().add(camOffset), 0.1);
+            camera.lookAt(state.pos);
+
+            renderer.render(scene, camera);
+        }
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        animate();
+    </script>
+</body>
+</html>

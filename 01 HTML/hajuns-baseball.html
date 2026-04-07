@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>Cyber Slugger: Mega Expansion</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;900&display=swap');
+        body { margin: 0; background: #010103; overflow: hidden; font-family: 'Orbitron', sans-serif; color: #fff; user-select: none; }
+        #ui-layer { position: absolute; inset: 0; pointer-events: none; z-index: 10; }
+        .screen { display: none; pointer-events: auto; width: 100%; height: 100%; background: rgba(0,0,0,0.96); flex-direction: column; align-items: center; justify-content: center; }
+        .active { display: flex; }
+        .btn { background: rgba(0, 242, 255, 0.1); border: 2px solid #00f2ff; color: #00f2ff; padding: 10px 20px; cursor: pointer; font-family: 'Orbitron'; transition: 0.2s; margin: 4px; border-radius: 4px; }
+        .btn:hover:not(:disabled) { background: #00f2ff; color: #000; box-shadow: 0 0 15px #00f2ff; }
+
+        /* 상점 무한 확장 레이아웃 */
+        .shop-container { width: 95%; max-width: 1200px; height: 85vh; overflow-y: auto; padding: 30px; border: 1px solid #444; background: rgba(5,5,10,0.95); border-radius: 15px; scrollbar-width: thin; scrollbar-color: #00f2ff #111; }
+        .category-title { color: #ffff00; font-size: 2rem; margin: 50px 0 20px; border-bottom: 5px solid #ffff00; text-align: left; width: 100%; text-shadow: 0 0 15px rgba(255,255,0,0.5); }
+        .shop-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 15px; padding-bottom: 100px; } 
+        .item-card { border: 1px solid #333; padding: 15px; text-align: center; background: linear-gradient(145deg, #111, #000); border-radius: 12px; transition: 0.3s; position: relative; overflow: hidden; }
+        .item-card:hover { border-color: #00f2ff; transform: translateY(-5px); }
+        .equipped { border: 2px solid #0f0 !important; box-shadow: 0 0 25px rgba(0,255,0,0.5); }
+        
+        .hud-left { position: absolute; top: 20px; left: 20px; color: #00f2ff; pointer-events: auto; background: rgba(0,0,0,0.7); padding: 18px; border-radius: 12px; border-left: 6px solid #00f2ff; }
+        #gauge-box { position: absolute; bottom: 60px; left: 50%; transform: translateX(-50%); width: 400px; height: 40px; border: 3px solid #fff; background: #111; display: none; }
+        #gauge-fill { height: 100%; width: 0%; background: linear-gradient(90deg, #00f2ff, #0077ff); box-shadow: 0 0 20px #00f2ff; }
+        #game-msg { position: absolute; top: 30%; left: 50%; transform: translate(-50%, -50%); font-size: 5.5rem; font-weight: 900; opacity: 0; transition: 0.2s; text-align: center; pointer-events: none; z-index: 100; text-shadow: 0 0 20px rgba(0,0,0,1); }
+    </style>
+</head>
+<body>
+
+<div id="ui-layer">
+    <div id="screen-home" class="screen active">
+        <h1 style="color: #00f2ff; font-size: 5rem; text-shadow: 0 0 40px #00f2ff; margin-bottom: 0;">CYBER SLUGGER</h1>
+        <p style="color: #555; margin-bottom: 30px;">MEGA EXPANSION v2.0</p>
+        <div id="wallet-main" style="color: #ffff00; font-size: 2.2rem; margin-bottom: 30px; font-weight: 900;">CREDITS: 0</div>
+        <div style="display:flex;">
+            <button class="btn" style="font-size:1.5rem; padding: 15px 40px;" onclick="startGame('BATTER')">BATTER MODE</button>
+            <button class="btn" style="font-size:1.5rem; padding: 15px 40px;" onclick="startGame('PITCHER')">PITCHER MODE</button>
+        </div>
+        <div style="display:flex; margin-top: 15px;">
+            <button class="btn" style="border-color:#ff00ff; color:#ff00ff; width: 200px;" onclick="showScreen('screen-shop')">ULTRA SHOP</button>
+            <button class="btn" style="border-color:#ffff00; color:#ffff00; width: 200px;" onclick="showScreen('screen-daily')">DAILY GIFT</button>
+        </div>
+    </div>
+
+    <div id="screen-shop" class="screen">
+        <h2 style="color:#00f2ff; font-size: 2.5rem; margin: 20px 0;">MEGA EQUIPMENT CENTER</h2>
+        <div class="shop-container" id="shop-scroll">
+            <div class="category-title">BATS: SPEED & DESTRUCTION</div>
+            <div id="bat-list" class="shop-grid"></div>
+            <div class="category-title">BALLS: SONIC REWARDS</div>
+            <div id="ball-list" class="shop-grid"></div>
+        </div>
+        <button class="btn" style="margin: 20px; width: 300px;" onclick="showScreen('screen-home')">RETURN TO BASE</button>
+    </div>
+
+    <div id="screen-daily" class="screen">
+        <h2 style="color:#ffff00; font-size: 2.5rem;">ATTENDANCE REWARD</h2>
+        <div id="reward-list" style="display:grid; grid-template-columns:repeat(7,1fr); gap:15px; width:90%; margin:40px 0;"></div>
+        <button id="claim-btn" class="btn" style="font-size: 1.5rem;" onclick="claimDaily()">CLAIM 5,000C</button>
+        <button class="btn" onclick="showScreen('screen-home')">BACK</button>
+    </div>
+
+    <div id="game-hud">
+        <div class="hud-left">
+            <div id="hud-credits" style="color:#ffff00; font-size:2.2rem; font-weight:900;">0</div>
+            <div id="bonus-info" style="color:#0f0; font-size:1rem; margin-top:5px; font-weight:bold;">REWARD: x1.0</div>
+            <button class="btn" style="padding: 8px 20px; margin-top:15px; border-color:#ff4444; color:#ff4444;" onclick="goHome()">GIVE UP</button>
+        </div>
+        <div id="gauge-box"><div id="gauge-fill"></div></div>
+        <div id="game-msg"></div>
+    </div>
+</div>
+
+<canvas id="canvas"></canvas>
+
+<script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    let userData = JSON.parse(localStorage.getItem('slugger_v20')) || {
+        credits: 5000, dayCount: 0, lastClaim: 0, owned: [1, 21], selBat: 1, selBall: 21
+    };
+    function save() { localStorage.setItem('slugger_v20', JSON.stringify(userData)); }
+
+    // 배트 20종 데이터
+    const batData = [
+        {id:1,  n:'Wooden Bat', p:1, c:'#8b4513', pr:0},
+        {id:2,  n:'Training Bat', p:1.3, c:'#a9a9a9', pr:1000},
+        {id:3,  n:'Aluminum Bat', p:1.8, c:'#c0c0c0', pr:3000},
+        {id:4,  n:'Pro Carbon', p:2.5, c:'#444', pr:8000},
+        {id:5,  n:'Titanium Slugger', p:3.2, c:'#778899', pr:15000},
+        {id:6,  n:'Neon Striker', p:4.0, c:'#00f2ff', pr:30000},
+        {id:7,  n:'Flame Burner', p:5.0, c:'#ff4500', pr:55000},
+        {id:8,  n:'Volt Crusher', p:6.2, c:'#ffd700', pr:90000},
+        {id:9,  n:'Laser Beam', p:7.5, c:'#ff0000', pr:150000},
+        {id:10, n:'Plasma Blade', p:9.0, c:'#ff00ff', pr:250000},
+        {id:11, n:'Gravity Well', p:11.0, c:'#483d8b', pr:400000},
+        {id:12, n:'Sonic Boom', p:13.5, c:'#1e90ff', pr:650000},
+        {id:13, n:'Crystal Edge', p:16.0, c:'#00fa9a', pr:1000000},
+        {id:14, n:'Dark Matter', p:20.0, c:'#111', pr:2000000},
+        {id:15, n:'Nebula Bat', p:25.0, c:'#9370db', pr:4000000},
+        {id:16, n:'Supernova', p:32.0, c:'#fffacd', pr:8000000},
+        {id:17, n:'Galaxy Core', p:40.0, c:'#0000cd', pr:15000000},
+        {id:18, n:'Time Bender', p:55.0, c:'#f0e68c', pr:30000000},
+        {id:19, n:'Dimension Ripper', p:80.0, c:'#ff1493', pr:70000000},
+        {id:20, n:'Infinity God Bat', p:120.0, c:'#ffff00', pr:150000000}
+    ];
+
+    // 공 20종 데이터 (보상 배율 중심)
+    const ballData = [
+        {id:21, n:'Base Ball', s:1, c:'#fff', pr:0},
+        {id:22, n:'Rubber Ball', s:1.2, c:'#eee', pr:1200},
+        {id:23, n:'Heavy Ball', s:1.5, c:'#ccc', pr:4000},
+        {id:24, n:'Swift Ball', s:1.9, c:'#87cefa', pr:10000},
+        {id:25, n:'Iron Ball', s:2.4, c:'#708090', pr:22000},
+        {id:26, n:'Fire Ball', s:3.0, c:'#ff4500', pr:45000},
+        {id:27, n:'Electric Ball', s:3.7, c:'#ffd700', pr:80000},
+        {id:28, n:'Wind Ball', s:4.5, c:'#f0f8ff', pr:130000},
+        {id:29, n:'Poison Ball', s:5.5, c:'#32cd32', pr:220000},
+        {id:30, n:'Ghost Ball', s:6.8, c:'#dda0dd', pr:380000},
+        {id:31, n:'Shadow Ball', s:8.5, c:'#4b0082', pr:600000},
+        {id:32, n:'Solar Ball', s:11.0, c:'#ffa500', pr:1000000},
+        {id:33, n:'Lunar Ball', s:14.0, c:'#afeeee', pr:2500000},
+        {id:34, n:'Void Ball', s:18.0, c:'#000', pr:5000000},
+        {id:35, n:'Pulsar Ball', s:25.0, c:'#ff00ff', pr:10000000},
+        {id:36, n:'Quasar Ball', s:35.0, c:'#00ffff', pr:25000000},
+        {id:37, n:'Black Hole', s:50.0, c:'#111', pr:60000000},
+        {id:38, n:'Wormhole', s:75.0, c:'#7fffd4', pr:150000000},
+        {id:39, n:'Multiverse', s:110.0, c:'#fff', pr:400000000},
+        {id:40, n:'The Omega', s:160.0, c:'#ffffff', pr:999999999}
+    ];
+
+    const allItems = [...batData, ...ballData];
+
+    let gameState = 'HOME', mode = 'BATTER';
+    let ball = { x: -200, y: 0, vx: 0, vy: 0, active: false, type: 'normal' };
+    let player = { x: 250, y: canvas.height * 0.7, swing: 0, isSwinging: false, canSwing: true };
+    let pitcher = { x: canvas.width - 250, y: canvas.height * 0.7 };
+    let gauge = { val: 0, dir: 1, active: false };
+
+    function drawBat(color) {
+        ctx.fillStyle = color;
+        ctx.fillRect(0, -6, 45, 12);
+        ctx.beginPath(); 
+        ctx.moveTo(45, -6); ctx.lineTo(150, -26); ctx.lineTo(175, -22);
+        ctx.lineTo(175, 22); ctx.lineTo(150, 26); ctx.lineTo(45, 6);
+        ctx.closePath(); ctx.fill();
+        ctx.beginPath(); ctx.arc(175, 0, 24, -Math.PI/2, Math.PI/2); ctx.fill();
+        ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+    }
+
+    function drawPerson(x, y, angle, isPitcher, color) {
+        ctx.fillStyle = color;
+        ctx.fillRect(x - 15, y - 65, 30, 55);
+        ctx.beginPath(); ctx.arc(x, y - 85, 20, 0, Math.PI*2); ctx.fill();
+        ctx.save();
+        ctx.translate(x, y - 50);
+        ctx.rotate(angle);
+        ctx.fillStyle = color; ctx.fillRect(0, -7, 45, 14);
+        if(!isPitcher) { ctx.translate(35, 0); drawBat(allItems.find(i=>i.id===userData.selBat).c); }
+        ctx.restore();
+    }
+
+    function showScreen(id) {
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+        document.getElementById(id).classList.add('active');
+        if(id === 'screen-shop') renderShop();
+        if(id === 'screen-daily') renderDaily();
+        updateUI();
+    }
+
+    function renderShop() {
+        const batList = document.getElementById('bat-list');
+        const ballList = document.getElementById('ball-list');
+        batList.innerHTML = ''; ballList.innerHTML = '';
+        
+        batData.forEach(i => {
+            const owned = userData.owned.includes(i.id);
+            const sel = (userData.selBat == i.id);
+            batList.innerHTML += createCard(i, owned, sel);
+        });
+        ballData.forEach(i => {
+            const owned = userData.owned.includes(i.id);
+            const sel = (userData.selBall == i.id);
+            ballList.innerHTML += createCard(i, owned, sel);
+        });
+    }
+
+    function createCard(i, owned, sel) {
+        return `<div class="item-card ${sel?'equipped':''}">
+            <div style="color:${i.c}; font-weight:900; font-size:1.1rem; text-shadow:0 0 5px ${i.c};">${i.n}</div>
+            <div style="font-size:0.7rem; color:#888; margin:8px 0;">${i.id<=20?'Swing Power':'Cash Bonus'}: x${(i.p||i.s).toLocaleString()}</div>
+            <button class="btn" style="width:100%; font-size:0.8rem;" onclick="${owned?'equip('+i.id+')':'buy('+i.id+')'}">
+                ${owned ? (sel?'ACTIVE':'EQUIP') : i.pr.toLocaleString()+' C'}
+            </button>
+        </div>`;
+    }
+
+    function buy(id) {
+        const i = allItems.find(x=>x.id==id);
+        if(userData.credits >= i.pr) { userData.credits -= i.pr; userData.owned.push(id); save(); renderShop(); updateUI(); }
+    }
+    function equip(id) {
+        if(id <= 20) userData.selBat = id; else userData.selBall = id;
+        save(); renderShop(); updateUI();
+    }
+
+    function renderDaily() {
+        const list = document.getElementById('reward-list'); list.innerHTML = '';
+        const canClaim = (Date.now() - userData.lastClaim > 86400000);
+        for(let i=0; i<7; i++) {
+            const state = i < userData.dayCount ? 'claimed' : (i === userData.dayCount && canClaim ? 'today' : '');
+            list.innerHTML += `<div style="border:2px solid ${state==='today'?'#ffff00':'#333'}; padding:15px; background:#111; text-align:center; color:${state==='claimed'?'#444':'#fff'}">DAY ${i+1}<br>5,000C</div>`;
+        }
+        document.getElementById('claim-btn').disabled = !canClaim || userData.dayCount >= 7;
+    }
+
+    function claimDaily() {
+        userData.credits += 5000; userData.dayCount++; userData.lastClaim = Date.now();
+        save(); renderDaily(); updateUI();
+    }
+
+    function startGame(m) {
+        mode = m; gameState = 'PLAY';
+        document.getElementById('screen-home').classList.remove('active');
+        document.getElementById('game-hud').style.display = 'block';
+        resetBall();
+    }
+
+    function goHome() {
+        gameState = 'HOME';
+        document.getElementById('game-hud').style.display = 'none';
+        document.getElementById('screen-home').classList.add('active');
+        updateUI();
+    }
+
+    function resetBall() {
+        ball.active = (mode === 'BATTER');
+        const rand = Math.random();
+        if(rand < 0.12) ball.type = 'homerun';
+        else if(rand < 0.37) ball.type = 'golden'; 
+        else ball.type = 'normal';
+
+        if(mode === 'BATTER') {
+            ball.x = canvas.width + 100; ball.y = canvas.height * 0.65;
+            const bBall = allItems.find(i=>i.id===userData.selBall);
+            let s = -22;
+            if(ball.type === 'golden') s = -50;
+            if(ball.type === 'homerun') s = -80;
+            ball.vx = s * (1 + Math.log10(bBall.s + 1)); ball.vy = 0; // 로그 스케일 속도 보정
+        } else ball.active = false;
+    }
+
+    function popMsg(t, c) {
+        const m = document.getElementById('game-msg');
+        m.innerHTML = t; m.style.color = c; m.style.opacity = 1;
+        setTimeout(()=>m.style.opacity = 0, 1500);
+    }
+
+    window.addEventListener('mousedown', (e) => {
+        if(gameState !== 'PLAY' || e.target.closest('.btn')) return;
+        if(mode === 'PITCHER' && !ball.active) {
+            gauge.active = true; gauge.val = 0;
+            document.getElementById('gauge-box').style.display = 'block';
+        } else if(mode === 'BATTER' && player.canSwing) {
+            player.isSwinging = true; player.canSwing = false; player.swing = -1.3;
+            // 타격 판정 범위 (아이템 등급에 따라 조금씩 유리하게)
+            if(ball.active && ball.vx < 0 && ball.x > 150 && ball.x < 650) {
+                const bBat = allItems.find(i=>i.id===userData.selBat);
+                const bBall = allItems.find(i=>i.id===userData.selBall);
+                ball.vx = 50 * Math.sqrt(bBat.p); ball.vy = -30;
+
+                let baseReward = ball.type==='homerun'? 5000 : (ball.type==='golden'? 1800 : 300);
+                let reward = Math.floor(baseReward * bBall.s);
+                userData.credits += reward;
+                popMsg(`${ball.type.toUpperCase()}<br>+${reward.toLocaleString()} C`, bBall.c);
+                save(); updateUI();
+            }
+        }
+    });
+
+    window.addEventListener('mouseup', () => {
+        if(mode === 'PITCHER' && gauge.active) {
+            gauge.active = false; document.getElementById('gauge-box').style.display = 'none';
+            let isPerf = (gauge.val >= 75 && gauge.val <= 90);
+            const bBall = allItems.find(i=>i.id===userData.selBall);
+            let reward = Math.floor((isPerf ? 600 : 150) * bBall.s);
+            userData.credits += reward;
+            popMsg(isPerf ? `PERFECT!<br>+${reward.toLocaleString()}C` : `GOOD<br>+${reward.toLocaleString()}C`, isPerf ? "#0f0" : "#fff");
+            ball.active = true; ball.x = pitcher.x - 60; ball.y = canvas.height * 0.65;
+            ball.vx = -30 * (isPerf ? 4.5 : 2.5) * (1 + Math.log10(bBall.s)); ball.vy = 0;
+            save(); updateUI();
+        }
+    });
+
+    function updateUI() {
+        document.getElementById('wallet-main').innerText = `CREDITS: ${userData.credits.toLocaleString()}`;
+        document.getElementById('hud-credits').innerText = userData.credits.toLocaleString() + " C";
+        const bBall = allItems.find(i=>i.id===userData.selBall);
+        document.getElementById('bonus-info').innerText = `REWARD: x${bBall.s.toLocaleString()}`;
+    }
+
+    function draw() {
+        ctx.fillStyle = '#010108'; ctx.fillRect(0,0,canvas.width,canvas.height);
+        if(gameState === 'PLAY') {
+            if(gauge.active) {
+                gauge.val += 4.5 * gauge.dir; if(gauge.val > 100 || gauge.val < 0) gauge.dir *= -1;
+                document.getElementById('gauge-fill').style.width = gauge.val + '%';
+            }
+            drawPerson(player.x, player.y, player.isSwinging ? player.swing : 0.6, false, '#00f2ff');
+            drawPerson(pitcher.x, pitcher.y, gauge.active ? -Math.PI/2 : 0, true, '#ff00ff');
+            
+            if(ball.active) {
+                ball.x += ball.vx; ball.y += ball.vy;
+                const ballStyle = allItems.find(i=>i.id===userData.selBall);
+                ctx.fillStyle = ball.type === 'normal' ? ballStyle.c : (ball.type==='golden'?'#ffff00':'#bf00ff');
+                ctx.shadowBlur = ball.type==='normal'?0:30; ctx.shadowColor = ctx.fillStyle;
+                ctx.beginPath(); ctx.arc(ball.x, ball.y, 16, 0, Math.PI*2); ctx.fill();
+                ctx.shadowBlur = 0;
+                
+                if(mode === 'PITCHER' && ball.vx < 0 && ball.x < 450 && ball.x > 250 && !player.isSwinging) {
+                    if(Math.random() < 0.28) { player.isSwinging=true; player.canSwing=false; player.swing=-1.3; ball.vx=50; ball.vy=-18; }
+                }
+                if(ball.x < -500 || ball.x > canvas.width + 500) resetBall();
+            }
+
+            if(player.isSwinging) {
+                const bBat = allItems.find(i=>i.id===userData.selBat);
+                // 스윙 가속도 대폭 강화 로직
+                player.swing += (0.5 + (Math.log10(bBat.p + 1) * 0.8)); 
+                
+                if(player.swing > 3.5) { 
+                    player.isSwinging = false; 
+                    setTimeout(()=>player.canSwing=true, Math.max(20, 150 - Math.log10(bBat.p) * 50)); 
+                }
+            }
+        }
+        requestAnimationFrame(draw);
+    }
+    updateUI(); draw();
+</script>
+</body>
+</html>
